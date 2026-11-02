@@ -56,8 +56,24 @@ if [ -f "$IPQ50XX/config-default" ] && \
 	red "         this port targets the mainline stmmac+DSA layout."
 fi
 
+# ipq-wifi changed layout over time:
+#   old (24.10/25.12):  src/board-<dev>.<chip>     + Makefile BOARD_NAMES
+#   new (master):       files/board-<dev>.<chip>   + Makefile ALLWIFIBOARDS
+# In the new layout the board files are copied into PKG_BUILD_DIR, and the
+# package picks them up with a wildcard - the Makefile documents exactly this
+# as the supported way to add local files.
+if [ -d "$IPQWIFI/src" ]; then
+	BDF_DIR="$IPQWIFI/src"
+	BOARD_LIST="BOARD_NAMES"
+else
+	BDF_DIR="$IPQWIFI/files"
+	BOARD_LIST="ALLWIFIBOARDS"
+	mkdir -p "$BDF_DIR"
+fi
+
 echo ">>> target tree : $QCA"
 echo ">>> dts dir    : $DTS_OUT"
+echo ">>> bdf dir    : $BDF_DIR (list: $BOARD_LIST)"
 echo ">>> source     : $SELF"
 
 # ------------------------------------------------------------------ dts ----
@@ -65,34 +81,32 @@ install -m 0644 "$SELF/dts/ipq5018-redmi-ax3000.dts" "$DTS_OUT/ipq5018-redmi-ax3
 green "OK  dts -> ${DTS_OUT#$TOPDIR/}/ipq5018-redmi-ax3000.dts"
 
 # ------------------------------------------------------------------ bdf ----
-install -m 0644 "$SELF/files/board-redmi_ax3000.ipq5018" "$IPQWIFI/src/board-redmi_ax3000.ipq5018"
-install -m 0644 "$SELF/files/board-redmi_ax3000.qcn6122" "$IPQWIFI/src/board-redmi_ax3000.qcn6122"
-green "OK  bdf -> ipq-wifi/src/board-redmi_ax3000.{ipq5018,qcn6122}"
+install -m 0644 "$SELF/files/board-redmi_ax3000.ipq5018" "$BDF_DIR/board-redmi_ax3000.ipq5018"
+install -m 0644 "$SELF/files/board-redmi_ax3000.qcn6122" "$BDF_DIR/board-redmi_ax3000.qcn6122"
+green "OK  bdf -> $(basename "$IPQWIFI")/$(basename "$BDF_DIR")/board-redmi_ax3000.{ipq5018,qcn6122}"
 
 # ------------------------------------------------------- ipq-wifi Makefile --
-python3 - "$IPQWIFI/Makefile" <<'PY'
+python3 - "$IPQWIFI/Makefile" "$BOARD_LIST" <<'PY'
 import sys, re, pathlib
 
 p = pathlib.Path(sys.argv[1])
+lst = sys.argv[2]
 s = p.read_text()
 
 if "redmi_ax3000" in s:
     print("SKIP ipq-wifi Makefile already carries redmi_ax3000")
     sys.exit(0)
 
-# 1) register in BOARD_NAMES (keep the list alphabetical: redmi_ax3000 < redmi_ax6)
-m = re.search(r'^BOARD_NAMES\s*:=\s*\\\n', s, re.M)
+m = re.search(r'^%s\s*:=\s*\\\n' % lst, s, re.M)
 if not m:
-    sys.exit("FAIL: BOARD_NAMES block not found in ipq-wifi/Makefile")
+    sys.exit("FAIL: %s block not found in ipq-wifi/Makefile" % lst)
 
 anchor = "\tredmi_ax6 \\\n"
 if anchor in s:
     s = s.replace(anchor, "\tredmi_ax3000 \\\n" + anchor, 1)
 else:
-    # fall back to inserting right after the BOARD_NAMES opener
     s = s[:m.end()] + "\tredmi_ax3000 \\\n" + s[m.end():]
 
-# 2) emit the package
 line = "$(eval $(call generate-ipq-wifi-package,redmi_ax3000,Redmi AX3000))\n"
 ref = "$(eval $(call generate-ipq-wifi-package,xiaomi_redmi-ax5400,Xiaomi Redmi AX5400))\n"
 if ref in s:
@@ -101,7 +115,7 @@ else:
     s = s.rstrip("\n") + "\n" + line
 
 p.write_text(s)
-print("OK  ipq-wifi/Makefile patched")
+print("OK  ipq-wifi/Makefile patched (%s)" % lst)
 PY
 green "OK  ipq-wifi-redmi_ax3000 registered"
 
@@ -195,8 +209,8 @@ check() {
 	fi
 }
 check "dts"                  "$DTS_OUT/ipq5018-redmi-ax3000.dts"
-check "2.4G bdf"             "$IPQWIFI/src/board-redmi_ax3000.ipq5018"
-check "5G bdf"               "$IPQWIFI/src/board-redmi_ax3000.qcn6122"
+check "2.4G bdf"             "$BDF_DIR/board-redmi_ax3000.ipq5018"
+check "5G bdf"               "$BDF_DIR/board-redmi_ax3000.qcn6122"
 grep -q "redmi_ax3000" "$IPQWIFI/Makefile"                       || { red "  FAIL ipq-wifi Makefile"; fail=1; }
 grep -q "Device/redmi_ax3000" "$IPQ50XX/image/ipq50xx.mk"        || { red "  FAIL ipq50xx.mk"; fail=1; }
 grep -q "redmi,ax3000" "$IPQ50XX/base-files/etc/board.d/02_network" || { red "  FAIL 02_network"; fail=1; }
