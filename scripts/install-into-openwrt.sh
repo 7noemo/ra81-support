@@ -38,20 +38,31 @@ die() { red "FATAL: $*"; exit 1; }
 [ -d "$IPQ50XX" ] || die "no $IPQ50XX - qualcommax has no ipq50xx subtarget"
 [ -d "$IPQWIFI" ] || die "no $IPQWIFI - ipq-wifi package missing"
 
-# Master renamed the ethernet driver from qca-nss-dp to stmmac; the DTS below
-# targets the stmmac + DSA layout. Bail out on trees that still use nss-dp.
-if ! grep -q 'CONFIG_STMMAC_ETH=y' "$IPQ50XX/config-default" 2>/dev/null; then
-	red "WARNING: $IPQ50XX/config-default has no CONFIG_STMMAC_ETH=y"
-	red "         this board port targets the stmmac+DSA layout (ImmortalWrt master / 25.12)."
-	red "         On an older qca-nss-dp tree ethernet will not come up."
+# Master moved the DTS files to target/linux/qualcommax/dts/, while 24.10/25.12
+# still keep them under files/arch/arm64/boot/dts/qcom/. Support both.
+if [ -d "$QCA/dts" ]; then
+	DTS_OUT="$QCA/dts"
+elif [ -d "$QCA/files/arch/arm64/boot/dts/qcom" ]; then
+	DTS_OUT="$QCA/files/arch/arm64/boot/dts/qcom"
+else
+	die "cannot locate the qualcommax DTS directory (neither dts/ nor files/arch/arm64/boot/dts/qcom/)"
+fi
+
+# Master/25.12 both drive IPQ5018 ethernet through stmmac + DSA qca8k. If a
+# tree still uses qca-nss-dp, the DTS below will not bring ethernet up.
+if [ -f "$IPQ50XX/config-default" ] && \
+   ! grep -qE 'CONFIG_NET_DSA_QCA8K|CONFIG_STMMAC_ETH' "$IPQ50XX/config-default"; then
+	red "WARNING: no DSA qca8k / stmmac in $IPQ50XX/config-default"
+	red "         this port targets the mainline stmmac+DSA layout."
 fi
 
 echo ">>> target tree : $QCA"
+echo ">>> dts dir    : $DTS_OUT"
 echo ">>> source     : $SELF"
 
 # ------------------------------------------------------------------ dts ----
-install -m 0644 "$SELF/dts/ipq5018-redmi-ax3000.dts" "$QCA/dts/ipq5018-redmi-ax3000.dts"
-green "OK  dts -> target/linux/qualcommax/dts/ipq5018-redmi-ax3000.dts"
+install -m 0644 "$SELF/dts/ipq5018-redmi-ax3000.dts" "$DTS_OUT/ipq5018-redmi-ax3000.dts"
+green "OK  dts -> ${DTS_OUT#$TOPDIR/}/ipq5018-redmi-ax3000.dts"
 
 # ------------------------------------------------------------------ bdf ----
 install -m 0644 "$SELF/files/board-redmi_ax3000.ipq5018" "$IPQWIFI/src/board-redmi_ax3000.ipq5018"
@@ -183,7 +194,7 @@ check() {
 		red "  FAIL $1 ($2)"; fail=1
 	fi
 }
-check "dts"                  "$QCA/dts/ipq5018-redmi-ax3000.dts"
+check "dts"                  "$DTS_OUT/ipq5018-redmi-ax3000.dts"
 check "2.4G bdf"             "$IPQWIFI/src/board-redmi_ax3000.ipq5018"
 check "5G bdf"               "$IPQWIFI/src/board-redmi_ax3000.qcn6122"
 grep -q "redmi_ax3000" "$IPQWIFI/Makefile"                       || { red "  FAIL ipq-wifi Makefile"; fail=1; }
