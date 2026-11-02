@@ -120,7 +120,10 @@ PY
 green "OK  ipq-wifi-redmi_ax3000 registered"
 
 # ------------------------------------------------------------ device def ----
-python3 - "$IPQ50XX/image/ipq50xx.mk" <<'PY'
+IMAGE_MK="$QCA/image/ipq50xx.mk"
+[ -f "$IMAGE_MK" ] || die "no $IMAGE_MK - unexpected qualcommax image layout"
+
+python3 - "$IMAGE_MK" <<'PY'
 import sys, pathlib
 
 p = pathlib.Path(sys.argv[1])
@@ -212,7 +215,7 @@ check "dts"                  "$DTS_OUT/ipq5018-redmi-ax3000.dts"
 check "2.4G bdf"             "$BDF_DIR/board-redmi_ax3000.ipq5018"
 check "5G bdf"               "$BDF_DIR/board-redmi_ax3000.qcn6122"
 grep -q "redmi_ax3000" "$IPQWIFI/Makefile"                       || { red "  FAIL ipq-wifi Makefile"; fail=1; }
-grep -q "Device/redmi_ax3000" "$IPQ50XX/image/ipq50xx.mk"        || { red "  FAIL ipq50xx.mk"; fail=1; }
+grep -q "Device/redmi_ax3000" "$IMAGE_MK"        || { red "  FAIL ipq50xx.mk"; fail=1; }
 grep -q "redmi,ax3000" "$IPQ50XX/base-files/etc/board.d/02_network" || { red "  FAIL 02_network"; fail=1; }
 
 if [ "$fail" -ne 0 ]; then
