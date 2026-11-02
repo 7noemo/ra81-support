@@ -175,13 +175,17 @@ if "redmi,ax3000" in s:
     print("SKIP 02_network already knows redmi,ax3000")
     sys.exit(0)
 
-# Same DSA topology as xiaomi,redmi-ax5400: qca8337 with gmac1 as CPU port.
+# Same DSA topology as xiaomi,redmi-ax5400 and cmcc,pz-l8: the QCA8337 has two
+# CPU ports (5 = gmii -> gmac0, 6 = sgmii -> gmac1). WAN egresses through gmac0
+# (eth0) and the three LAN ports through gmac1 (eth1), which is exactly how
+# upstream describes those two boards. The vendor ess-switch bitmap agrees:
+# switch_cpu_bmp=0x60, switch_lan_bmp=0x0e, switch_wan_bmp=0x10.
 case = """\tredmi,ax3000)
 \t\tucidef_set_interfaces_lan_wan "lan1 lan2 lan3" "wan"
 \t\tucidef_set_network_device_conduit "lan1" "eth1"
 \t\tucidef_set_network_device_conduit "lan2" "eth1"
 \t\tucidef_set_network_device_conduit "lan3" "eth1"
-\t\tucidef_set_network_device_conduit "wan" "eth1"
+\t\tucidef_set_network_device_conduit "wan" "eth0"
 \t\t;;
 """
 

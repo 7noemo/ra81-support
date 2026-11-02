@@ -44,11 +44,17 @@
 
 	chosen {
 		/*
-		 * Stock u-boot passes ubi.mtd=rootfs_1 and root=/dev/ubiblock0_1.
-		 * We always boot slot A (mtd18 "rootfs"), the kernel lives inside
-		 * the UBI volume 0 and the rootfs is volume 1 (KERNEL_IN_UBI).
+		 * Do NOT pin ubi.mtd here. The stock bootloader passes
+		 * "ubi.mtd=rootfs" or "ubi.mtd=rootfs_1" depending on the boot
+		 * slot flag, and that is the only thing that makes the A/B
+		 * layout work: the installer flashes the *other* slot, then
+		 * flips the flag. Appending our own ubi.mtd= would attach the
+		 * wrong (or both) UBI devices and boot the old system.
+		 *
+		 * root=/dev/ubiblock0_1 is slot-independent: it refers to UBI
+		 * device 0, volume 1 (KERNEL_IN_UBI), whichever mtd it came from.
 		 */
-		bootargs-append = " ubi.mtd=rootfs root=/dev/ubiblock0_1 coherent_pool=2M";
+		bootargs-append = " root=/dev/ubiblock0_1 coherent_pool=2M";
 		stdout-path = "serial0:115200n8";
 	};
 
@@ -290,11 +296,15 @@
 				reg = <0x00a80000 0x02400000>;
 			};
 
-			/* Slot B, kept untouched so a stock rollback stays possible */
+			/*
+			 * Slot B. Must stay writable: installing from the stock
+			 * firmware means the vendor system is running from slot A,
+			 * so the only safe target is this one (ubiformat rootfs_1).
+			 * Marking it read-only makes ubiformat fail with EROFS.
+			 */
 			partition@2e80000 {
 				label = "rootfs_1";
 				reg = <0x02e80000 0x02400000>;
-				read-only;
 			};
 
 			partition@5280000 {
