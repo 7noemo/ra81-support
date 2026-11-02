@@ -138,11 +138,18 @@ block = """
 # IPQ5018 + QCA8337 + QCN6102 (5G as a WCSS userpd).
 # Stock NAND layout is 128 MiB with A/B rootfs; we always install into slot A
 # (mtd18 "rootfs") and keep slot B read-only for a stock rollback.
+#
+# Naming: DEVICE_IMG_PREFIX is what ends up in the file name, the manifest and
+# profiles.json, so it is pinned to the retail name instead of the generic
+# "immortalwrt-qualcommax-ipq50xx-redmi_ax3000" prefix. Keep it in sync with
+# DEVICE_VENDOR/DEVICE_MODEL - that pair is what LuCI and the profile list show.
 define Device/redmi_ax3000
 \t$(call Device/FitImage)
 \t$(call Device/UbiFit)
 \tDEVICE_VENDOR := Redmi
 \tDEVICE_MODEL := AX3000
+\tDEVICE_VARIANT := (RA81)
+\tDEVICE_IMG_PREFIX := ImmortalWrt-Redmi-AX3000
 \tDEVICE_ALT0_VENDOR := Xiaomi
 \tDEVICE_ALT0_MODEL := CR880x
 \tDEVICE_ALT0_VARIANT := (same image, BDF covers M79/M81)
@@ -220,6 +227,10 @@ check "2.4G bdf"             "$BDF_DIR/board-redmi_ax3000.ipq5018"
 check "5G bdf"               "$BDF_DIR/board-redmi_ax3000.qcn6122"
 grep -q "redmi_ax3000" "$IPQWIFI/Makefile"                       || { red "  FAIL ipq-wifi Makefile"; fail=1; }
 grep -q "Device/redmi_ax3000" "$IMAGE_MK"        || { red "  FAIL ipq50xx.mk"; fail=1; }
+grep -q "DEVICE_IMG_PREFIX := ImmortalWrt-Redmi-AX3000" "$IMAGE_MK" \
+                                                 || { red "  FAIL image prefix is not Redmi-branded"; fail=1; }
+grep -q 'model = "Redmi AX3000' "$DTS_OUT/ipq5018-redmi-ax3000.dts" \
+                                                 || { red "  FAIL dts model string"; fail=1; }
 grep -q "redmi,ax3000" "$IPQ50XX/base-files/etc/board.d/02_network" || { red "  FAIL 02_network"; fail=1; }
 
 if [ "$fail" -ne 0 ]; then

@@ -26,7 +26,7 @@
 #include <dt-bindings/leds/common.h>
 
 / {
-	model = "Redmi AX3000";
+	model = "Redmi AX3000 (RA81)";
 	compatible = "redmi,ax3000", "qcom,ipq5018";
 
 	#address-cells = <2>;
